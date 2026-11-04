@@ -1,0 +1,52 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OnlineStore.Api", "OnlineStore.Api\OnlineStore.Api.csproj", "{C0A5CAE2-4AFD-4ABF-B081-4A6EE7084015}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OnlineStore.Application", "OnlineStore.Application\OnlineStore.Application.csproj", "{B706B903-A460-4C0C-9EC6-E3030AFFF91E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OnlineStore.Domain", "OnlineStore.Domain\OnlineStore.Domain.csproj", "{D6711BF1-E7D0-45FF-844C-AC263AEE8E4A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OnlineStore.Infrastructure", "OnlineStore.Infrastructure\OnlineStore.Infrastructure.csproj", "{A9AADFA6-2CE2-43CC-8CF7-6713724C09A4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OnlineStore.Tests", "OnlineStore.Tests\OnlineStore.Tests.csproj", "{0A703E6E-223B-481D-B118-8D9323708A61}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OnlineStore_Functions", "OnlineStore.Functions\OnlineStore_Functions.csproj", "{A0A37A3D-3188-4294-AC20-BFC411721402}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C0A5CAE2-4AFD-4ABF-B081-4A6EE7084015}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C0A5CAE2-4AFD-4ABF-B081-4A6EE7084015}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C0A5CAE2-4AFD-4ABF-B081-4A6EE7084015}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C0A5CAE2-4AFD-4ABF-B081-4A6EE7084015}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B706B903-A460-4C0C-9EC6-E3030AFFF91E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B706B903-A460-4C0C-9EC6-E3030AFFF91E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B706B903-A460-4C0C-9EC6-E3030AFFF91E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B706B903-A460-4C0C-9EC6-E3030AFFF91E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D6711BF1-E7D0-45FF-844C-AC263AEE8E4A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D6711BF1-E7D0-45FF-844C-AC263AEE8E4A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D6711BF1-E7D0-45FF-844C-AC263AEE8E4A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D6711BF1-E7D0-45FF-844C-AC263AEE8E4A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A9AADFA6-2CE2-43CC-8CF7-6713724C09A4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A9AADFA6-2CE2-43CC-8CF7-6713724C09A4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A9AADFA6-2CE2-43CC-8CF7-6713724C09A4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A9AADFA6-2CE2-43CC-8CF7-6713724C09A4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0A703E6E-223B-481D-B118-8D9323708A61}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0A703E6E-223B-481D-B118-8D9323708A61}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0A703E6E-223B-481D-B118-8D9323708A61}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0A703E6E-223B-481D-B118-8D9323708A61}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A0A37A3D-3188-4294-AC20-BFC411721402}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A0A37A3D-3188-4294-AC20-BFC411721402}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A0A37A3D-3188-4294-AC20-BFC411721402}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A0A37A3D-3188-4294-AC20-BFC411721402}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
