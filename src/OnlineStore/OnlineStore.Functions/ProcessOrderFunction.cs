@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 using OnlineStore.Application.Abstractions;
+using OnlineStore.Domain.Entities;
 
 namespace OnlineStore.Functions;
 
