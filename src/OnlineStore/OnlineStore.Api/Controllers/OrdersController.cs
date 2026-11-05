@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using OnlineStore.Application.Commands.PlaceOrder;
+using OnlineStore.Application.Commands.ShipOrder;
 using OnlineStore.Application.Queries.GetCustomerOrders;
 
 namespace OnlineStore.Api.Controllers;
@@ -22,4 +23,11 @@ public sealed class OrdersController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetForCustomer([FromQuery] Guid customerId, CancellationToken ct)
         => Ok(await _sender.Send(new GetCustomerOrdersQuery(customerId), ct));
+
+    [HttpPatch("{orderId:guid}/ship")]
+    public async Task<IActionResult> Ship(Guid orderId, [FromQuery] Guid customerId, CancellationToken ct)
+    {
+        await _sender.Send(new ShipOrderCommand(customerId, orderId), ct);
+        return NoContent();
+    }
 }

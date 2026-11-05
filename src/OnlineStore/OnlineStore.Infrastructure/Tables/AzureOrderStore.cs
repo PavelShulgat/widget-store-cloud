@@ -76,11 +76,10 @@ public sealed class AzureOrderStore : IOrderWriteStore, IOrderReadStore
 
     public async Task<IReadOnlyList<Order>> GetShippedSinceAsync(DateTimeOffset since, CancellationToken ct = default)
 {
-    // Cross-partition scan: deliberately batched into a scheduled Function rather
-    // than served on-demand, because CustomerId is the partition key.
+    var filter = $"ShipDate ge datetime'{since.UtcDateTime:yyyy-MM-ddTHH:mm:ssZ}'";
+
     var results = new List<Order>();
-    var query = _table.QueryAsync<OrderEntity>(
-        e => e.ShipDate >= since, cancellationToken: ct);
+    var query = _table.QueryAsync<OrderEntity>(filter: filter, cancellationToken: ct);
 
     await foreach (var entity in query) results.Add(Map(entity));
     return results;

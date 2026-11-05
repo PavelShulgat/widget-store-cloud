@@ -8,16 +8,29 @@ namespace OnlineStore.Functions;
 
 public sealed class ProcessOrderFunction
 {
+    private readonly IOrderWriteStore _store;
     private readonly ILogger<ProcessOrderFunction> _logger;
-    public ProcessOrderFunction(ILogger<ProcessOrderFunction> logger) => _logger = logger;
+
+    public ProcessOrderFunction(IOrderWriteStore store, ILogger<ProcessOrderFunction> logger)
+    {
+        _store = store;
+        _logger = logger;
+    }
 
     [Function(nameof(ProcessOrderFunction))]
-    public Task Run([QueueTrigger("orders", Connection = "AzureWebJobsStorage")] string body)
+    public async Task Run([QueueTrigger("orders", Connection = "AzureWebJobsStorage")] string body)
     {
         var message = JsonSerializer.Deserialize<OrderPlacedMessage>(body)!;
-        _logger.LogInformation("Processing order {OrderId} for customer {CustomerId}",
-            message.OrderId, message.CustomerId);
-        // next step: persist to Table Storage with PartitionKey = CustomerId
-        return Task.CompletedTask;
+
+        var order = new Order
+        {
+            Id = message.OrderId,
+            CustomerId = message.CustomerId,
+            Lines = message.Lines.Select(l => new OrderLine(l.ProductId, l.Quantity, l.UnitPrice)).ToList(),
+            OrderDate = message.OrderDate
+        };
+
+        await _store.SaveAsync(order);
+        _logger.LogInformation("Persisted order {OrderId}", order.Id);
     }
 }
