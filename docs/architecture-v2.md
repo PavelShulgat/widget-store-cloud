@@ -3,6 +3,10 @@
 Proof of concept for migrating the Widget & Co online store from ISP hosting to Azure.
 No frontend; the deliverable is the data architecture and the service layer around it.
 
+**Implementation status.** Queue Storage, Table Storage, Blob Storage and SQL (EF Core)
+are implemented and demonstrable. Cosmos DB for the review forum is designed but not
+implemented — see §11.
+
 ---
 
 ## 1. The problem being solved
@@ -22,18 +26,26 @@ service whose access pattern it actually matches.
 
 ## 2. Service selection
 
-| Data | Service | Reasoning |
-|---|---|---|
-| Product specifications | Azure SQL + EF Core | Structured, relational, low write volume, benefits from joins and constraints. The scenario states it is already in SQL; there is no reason to move it. |
-| Product images | Blob Storage | Binary objects of unbounded size. Storing them in SQL inflates row size and backup time for no benefit. Only the blob URL is kept in the product row. |
-| Incoming orders (write) | Queue Storage | Decouples accepting an order from persisting it. See §3. |
-| Orders (persisted) | Table Storage | High write volume, always accessed by customer, no joins required. Cheaper per transaction than SQL and scales horizontally by partition. |
-| Computed metrics | Table Storage | Small, append-only, read by metric name. Shares the storage account with orders. |
-| Customer data shared with Wiley & Co | Separate store behind its own service boundary | Two departments sharing one database schema is the coupling this architecture exists to avoid. Shared via API contract, not a shared connection string. |
-| Forum reviews | Cosmos DB (NoSQL API) | Schema-flexible documents, very high volume, anonymous (no relational integrity to enforce). Cosmos' analytical store gives marketing a profiling path without touching the transactional workload. |
+| Data | Service | Status | Reasoning |
+|---|---|---|---|
+| Product specifications | SQL via EF Core | Implemented | Structured, relational, low write volume, benefits from constraints and indexing. The scenario states it is already in SQL; there is no reason to move it. |
+| Product images | Blob Storage | Implemented | Binary objects of unbounded size. Storing them in SQL inflates row size and backup time for no benefit. Only the blob URL is kept in the product row. |
+| Incoming orders (write) | Queue Storage | Implemented | Decouples accepting an order from persisting it. See §3. |
+| Orders (persisted) | Table Storage | Implemented | High write volume, always accessed by customer, no joins required. Cheaper per transaction than SQL and scales horizontally by partition. |
+| Computed metrics | Table Storage | Implemented | Small, append-only, read by metric name. Shares the storage account with orders. |
+| Customer data shared with Wiley & Co | Separate store behind its own service boundary | Designed | Two departments sharing one database schema is the coupling this architecture exists to avoid. Shared via API contract, not a shared connection string. |
+| Forum reviews | Cosmos DB (NoSQL API) | Designed, not implemented | Schema-flexible documents, very high volume, anonymous. Cosmos' analytical store gives marketing a profiling path without touching the transactional workload. |
 
 The principle throughout: **access pattern decides the store**, not familiarity with one
 technology.
+
+### Local provider substitution
+
+The PoC runs against **Azurite** (storage emulator) and **SQLite** (relational), so the
+whole system works offline with no Azure subscription. The EF Core code is provider-
+agnostic: moving to Azure SQL is a single line in `DependencyInjection.cs`
+(`UseSqlite` → `UseSqlServer`), which is the point of the EF abstraction and the reason
+the repository interface exposes no provider-specific types.
 
 ---
 
@@ -75,6 +87,15 @@ Consequences, stated plainly:
 
 Queue messages are base64-encoded (`QueueMessageEncoding.Base64`) to match what the
 Functions queue trigger expects.
+
+### Contrast: the product write path
+
+`POST /api/products` returns **201 Created**, synchronously, because the product genuinely
+exists in SQL by the time the response is written. The catalogue has low write volume and
+no peak-load problem, so queueing it would add latency and complexity for nothing.
+
+The two status codes are not a style choice — they describe two genuinely different
+guarantees, and the difference is the architecture doing its job.
 
 ---
 
@@ -121,8 +142,19 @@ PartitionKey = metric name  (e.g. "orderprocessed")
 RowKey       = inverted ticks of computation time
 ```
 
-Same inversion for the same reason: "the last N values of this metric" is a single-partition
-top-N read.
+Same inversion for the same reason: "the last N values of this metric" is a
+single-partition top-N read.
+
+### Blob naming
+
+```
+product-images/{ProductId}/{random32hex}{extension}
+```
+
+Blob Storage has a flat namespace, but a `/` prefix behaves as a virtual folder for
+listing. Prefixing by product id makes "all images for this product" a cheap prefix query;
+the random suffix avoids collisions and stops a re-upload silently overwriting an existing
+image.
 
 ---
 
@@ -137,8 +169,8 @@ because the data is partitioned by customer. Cross-partition queries in Table St
 no index to use and cost time proportional to table size. Serving that synchronously on an
 HTTP request would reintroduce exactly the kind of slow path this architecture removed.
 
-`CalculateOrderMetricsFunction` (TimerTrigger) therefore runs the scan on a schedule, writes
-a single aggregate row, and any consumer reads that one row in constant time.
+`CalculateOrderMetricsFunction` (TimerTrigger) therefore runs the scan on a schedule,
+writes a single aggregate row, and any consumer reads that one row in constant time.
 
 The trade-off is staleness bounded by the schedule interval, which for a business metric is
 irrelevant.
@@ -155,11 +187,11 @@ Read and write paths share no code and no model.
 
 | | Write | Read |
 |---|---|---|
-| Entry | `PlaceOrderCommand`, `ShipOrderCommand` | `GetCustomerOrdersQuery` |
+| Entry | `PlaceOrderCommand`, `ShipOrderCommand`, `CreateProductCommand` | `GetCustomerOrdersQuery`, `GetProductsQuery` |
 | Dispatch | MediatR `ISender` | MediatR `ISender` |
 | Storage interface | `IOrderWriteStore` | `IOrderReadStore` |
-| Path | Controller → queue → Function → table | Controller → table |
-| Response | 202 / 204, asynchronous | Data, synchronous |
+| Path (orders) | Controller → queue → Function → table | Controller → table |
+| Response | 202 / 201 / 204 | Data, synchronous |
 
 The mediator (MediatR) keeps controllers free of business logic: a controller action
 constructs a command or query and sends it, nothing more. Handlers depend only on
@@ -168,6 +200,9 @@ interfaces declared in the Application layer.
 Splitting the store into two interfaces rather than one `IOrderRepository` is what makes
 the separation enforceable rather than conventional — a read handler cannot write, because
 the type it depends on has no write method.
+
+Read queries use `AsNoTracking()` on the EF Core side: catalogue reads never mutate
+entities, so EF's change tracker is pure overhead for them.
 
 ---
 
@@ -182,40 +217,64 @@ OnlineStore.Domain          ──▶ (nothing)
 ```
 
 Dependencies point inward. The Application layer declares the interfaces
-(`IOrderQueue`, `IOrderWriteStore`, `IOrderReadStore`, `IMetricsStore`); Infrastructure
-implements them against Azure SDKs; neither Api nor Functions contains business logic.
+(`IOrderQueue`, `IOrderWriteStore`, `IOrderReadStore`, `IMetricsStore`, `IImageStore`,
+`IProductRepository`); Infrastructure implements them against Azure SDKs and EF Core;
+neither Api nor Functions contains business logic.
 
 Two practical consequences:
 
 - **Both hosts reuse the same core.** The API and the Functions host are two entry points
   over one Application layer — no duplicated logic.
-- **Handlers are testable without Azure.** Every dependency is an interface, so unit tests
-  mock them and run with no emulator and no network.
+- **Handlers are testable without Azure.** Every dependency is an interface, so the unit
+  test suite mocks them with Moq and runs with **no emulator, no network and no database**.
+  That the tests need no infrastructure at all is the concrete evidence that the coupling
+  is genuinely loose rather than nominally so.
 
 ---
 
 ## 8. Security
 
-- Connection strings come from configuration (`appsettings`, `local.settings.json`), never
-  from source. `local.settings.json` is gitignored.
-- In Azure these move to Application Settings, and in production to Key Vault with managed
-  identity, removing stored credentials entirely.
+- Connection strings are read from configuration — `appsettings.Development.json` for the
+  API, `local.settings.json` for the Functions host — and never appear in source.
+- `local.settings.json` is gitignored, so the file that would hold real credentials outside
+  the emulator is never committed.
+- In Azure these move to Application Settings; in production to Key Vault with a managed
+  identity, which removes stored credentials entirely.
 - Reviews are anonymous by design: no user identifier is written alongside review content,
   which keeps the marketing analytics path free of personal data.
+
+### Blob access
+
+The `product-images` container is configured with `PublicAccessType.Blob`: individual
+blobs are readable by URL, but the container cannot be listed, so URLs cannot be
+enumerated. This is convenient for a PoC and lets a CDN serve images without the API in
+the request path.
+
+Production would differ. Many Azure accounts disable anonymous blob access at the account
+level, and the correct pattern is a private container with short-lived SAS URLs generated
+per request. That trades a little latency for revocable, time-bounded access.
 
 ---
 
 ## 9. Local development
 
-The whole system runs against **Azurite**, the Azure Storage emulator, via the connection
-string `UseDevelopmentStorage=true`. Queues, tables and blobs all work offline, so the PoC
-is developed and demonstrated without an Azure subscription.
-
 ```
-Terminal 1   azurite
+Terminal 1   azurite                        # queues, tables, blobs
 Terminal 2   dotnet run   (OnlineStore.Api)
 Terminal 3   func start   (OnlineStore.Functions)
 ```
+
+SQLite needs no process — the database is a file created by `dotnet ef database update`.
+
+End-to-end demonstration:
+
+1. `POST /api/products` → 201 with a product id
+2. `POST /api/products/{id}/images` → 201, image in Blob Storage, URL written to SQL
+3. `GET /api/products` → product row now carries the blob URL
+4. `POST /api/orders` → 202, message on the queue
+5. `ProcessOrderFunction` drains the queue → order row in Table Storage
+6. `PATCH /api/orders/{id}/ship` → 204, ShipDate set
+7. `CalculateOrderMetricsFunction` fires on schedule → `orderprocessed` written to metrics
 
 ---
 
@@ -228,5 +287,14 @@ Stated deliberately rather than hidden:
   few orders; the cleaner design passes the RowKey to the caller.
 - The metric scan reads all shipped orders in the window on every run. At real volume this
   would be replaced by an incremental aggregate or Azure Data Explorer.
+- `GetShippedSinceAsync` uses a raw OData filter string rather than a LINQ expression,
+  because the LINQ translation of a nullable `DateTimeOffset` comparison proved unreliable
+  against the emulator.
+- Image upload and the SQL metadata update are two separate operations with no transaction
+  across them. A failure between the two leaves an orphaned blob. Production would
+  reconcile with a cleanup job, since no distributed transaction spans Blob and SQL.
 - There is no dead-letter handling beyond the queue's built-in poison-message behaviour.
 - The PoC has no frontend and no authentication, both out of scope per the assignment.
+
+---
+
