@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using OnlineStore.Application.Commands.SetProductImage;
 using OnlineStore.Application.Commands.UploadProductImage;
 
 namespace OnlineStore.Api.Controllers;
@@ -22,6 +23,8 @@ public sealed class ProductImagesController : ControllerBase
 
         var url = await _sender.Send(
             new UploadProductImageCommand(productId, file.FileName, stream, file.ContentType), ct);
+
+        await _sender.Send(new SetProductImageCommand(productId, url), ct);
 
         return Created(url, new { url });
     }

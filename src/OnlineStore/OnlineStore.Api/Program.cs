@@ -8,7 +8,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddControllers();
 builder.Services.AddMediatR(cfg =>
     cfg.RegisterServicesFromAssembly(typeof(PlaceOrderCommand).Assembly));
-builder.Services.AddInfrastructure("UseDevelopmentStorage=true");
+builder.Services.AddInfrastructure("UseDevelopmentStorage=true", "Data Source=onlinestore.db");
 
 var app = builder.Build();
 
