@@ -11,7 +11,9 @@ var builder = FunctionsApplication.CreateBuilder(args);
 
 builder.ConfigureFunctionsWebApplication();
 
-builder.Services.AddInfrastructure(builder.Configuration["AzureWebJobsStorage"]!, "Data Source=onlinestore.db");
+builder.Services.AddInfrastructure(
+    builder.Configuration["AzureWebJobsStorage"]!,
+    builder.Configuration["ProductsDb"]!);
 
 if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("APPLICATIONINSIGHTS_CONNECTION_STRING")))
 {
